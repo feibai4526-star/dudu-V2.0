@@ -538,7 +538,7 @@
             <div style="text-align:center; color:#999; font-size:12px; padding:10px;" id="empty-pending">暂无待存入时间</div>
         </div>
         <div class="exchange-zone">
-            <div class="section-title" style="width:100%; margin-top:0;">🔄 拖动兑换到场景</div>
+            <div class="section-title" style="width:100%; margin-top:0;">🔄 选择场景使用</div>
             <div class="draggable-time" id="draggable-source" style="display:none;"><span id="drag-val">10</span></div>
             <div class="target-grid">
                 <div class="target-icon-box" onclick="exchangeMock('work')"><div class="target-icon">💼</div><div style="font-size:10px; color:#666;">工作</div></div>
@@ -1197,23 +1197,43 @@
         renderPendingList();
     }
 
-    function renderPendingList() {
-        const pendingList = document.getElementById('pending-list');
-        const emptyTip = document.getElementById('empty-pending');
-        if (state.pendingGains.length === 0) {
-            emptyTip.style.display = 'block'; pendingList.innerHTML = ''; return;
-        }
-        emptyTip.style.display = 'none';
-        pendingList.innerHTML = state.pendingGains.map((item, index) => `
-            <div class="time-card" style="border-left-color: ${item.color || '#ccc'}">
-                <div class="card-info">
-                    <div style="font-size:14px; font-weight:bold; color:#333;">${item.desc}</div>
-                    <div style="font-size:11px; color:#999;">${item.time || new Date().toLocaleTimeString()}</div>
-                </div>
-                <button class="store-btn" onclick="storeToBank(${index})">存入</button>
-            </div>
-        `).join('');
+ function renderPendingList() {
+    // 1. 获取核心元素
+    const pendingList = document.getElementById('pending-list');
+    const emptyTip = document.getElementById('empty-pending');
+    
+    // 2. 基础容错：元素不存在直接返回，避免报错
+    if (!pendingList || !emptyTip) return;
+
+    // 3. 空状态处理：只隐藏/显示空提示，不再清空整个容器（关键修复！）
+    if (state.pendingGains.length === 0) {
+        emptyTip.style.display = 'block'; // 显示空提示
+        // 移除列表项（保留 empty-pending 元素）
+        const listItems = pendingList.querySelectorAll('.time-card');
+        listItems.forEach(item => item.remove());
+        return;
     }
+
+    // 4. 有数据状态：隐藏空提示，渲染列表项
+    emptyTip.style.display = 'none';
+    // 先清空原有列表项（保留 empty-pending）
+    const listItems = pendingList.querySelectorAll('.time-card');
+    listItems.forEach(item => item.remove());
+    // 渲染新的待存入卡片（追加到容器中，不覆盖 empty-pending）
+    state.pendingGains.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.className = 'time-card';
+        card.style.borderLeftColor = item.color || '#ccc';
+        card.innerHTML = `
+            <div class="card-info">
+                <div style="font-size:14px; font-weight:bold; color:#333;">${item.desc}</div>
+                <div style="font-size:11px; color:#999;">${item.time || new Date().toLocaleTimeString()}</div>
+            </div>
+            <button class="store-btn" onclick="storeToBank(${index})">存入</button>
+        `;
+        pendingList.appendChild(card); // 追加卡片，不删除 empty-pending
+    });
+}
 
     function storeToBank(index) {
         if (index < 0 || index >= state.pendingGains.length) return;
@@ -1242,6 +1262,7 @@
             state.pendingGains.push({ minutes: gain, desc: `${state.status.text} 加速收益`, color: colorMap[state.status.type] || getCSSVar('--bank-gold'), time: new Date().toLocaleTimeString() });
         }
         hideModal(); updateUI();
+        switchPage('bank'); // 核心：自动跳转到银行页面
         showModal('success', { title: '调节生效', text: gain > 0 ? `时间流速已更新，获得 ${gain} 分钟收益等待存入` : '时间流速已更新，享受慢生活吧～' });
     }
 
